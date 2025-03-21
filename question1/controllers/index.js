@@ -67,4 +67,54 @@ async function getTopUsers(req, res) {
   }
 }
 
-module.exports = { getTopUsers };
+
+const POSTS_URL = 'http://20.244.56.144/test/posts';
+
+async function getLatestPosts(req, res) {
+  try {
+      const accessToken = await getAccessToken();
+
+      const usersResponse = await axios.get(USERS_URL, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      const usersData = usersResponse.data.users || usersResponse.data;
+      const users = Object.entries(usersData).map(([id, name]) => ({
+          id: Number(id),
+          name,
+      }));
+
+      if (users.length === 0) {
+          return res.status(404).json({ message: "No users found" });
+      }
+
+      let allPosts = [];
+
+      for (const user of users) {
+          try {
+              const postsResponse = await axios.get(`${USERS_URL}/${user.id}/posts`, {
+                  headers: { Authorization: `Bearer ${accessToken}` }
+              });
+
+              allPosts.push(...(postsResponse.data.posts || []));
+          } catch (error) {
+              console.error(`Error fetching posts for user ${user.id}:`, error.message);
+          }
+      }
+
+      if (allPosts.length === 0) {
+          return res.status(404).json({ message: "No posts found" });
+      }
+
+      const latestPosts = allPosts
+          .sort((a, b) => b.id - a.id)
+          .slice(0, 5);
+
+      res.json(latestPosts);
+  } catch (error) {
+      console.error("Error fetching latest posts:", error.message);
+      res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+module.exports = { getTopUsers, getLatestPosts };
